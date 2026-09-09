@@ -1,0 +1,5 @@
+src/config.local.js
+.vercel
+.env
+.env.local
+node_modules/

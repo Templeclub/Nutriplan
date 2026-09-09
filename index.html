@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>NutriPlan</title>
+  <meta name="description" content="Bibliothèque de recettes, qualification nutritionnelle et planning hebdomadaire personnel." />
+  <meta name="theme-color" content="#059669" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "preact": "https://esm.sh/preact@10.24.3",
+      "preact/hooks": "https://esm.sh/preact@10.24.3/hooks",
+      "preact/compat": "https://esm.sh/preact@10.24.3/compat",
+      "htm": "https://esm.sh/htm@3.1.1",
+      "htm/preact": "https://esm.sh/htm@3.1.1/preact?external=preact",
+      "dexie": "https://esm.sh/dexie@4.0.11"
+    }
+  }
+  </script>
+
+  <style>
+    html, body { height: 100%; overscroll-behavior-y: contain; }
+    body { -webkit-tap-highlight-color: transparent; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  </style>
+</head>
+<body class="bg-slate-50">
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
