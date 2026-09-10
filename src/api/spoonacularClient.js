@@ -1,8 +1,14 @@
 // Client Spoonacular. En production, tous les appels passent par /api/spoonacular
 // (fonction serverless Vercel) pour ne jamais exposer la clé côté client.
 // En dev local (pas de Node donc pas de fonction serverless disponible sur
-// localhost:8765), on appelle l'API directement avec une clé de dev lue depuis
+// localhost:8766), on appelle l'API directement avec une clé de dev lue depuis
 // src/config.local.js — fichier gitignored, jamais commité. Voir config.local.example.js.
+//
+// L'API est anglophone : la requête de l'utilisateur est traduite FR→EN avant
+// l'appel, et le contenu d'une recette est traduit EN→FR une seule fois, au
+// moment de l'ajout en bibliothèque (cf. translationClient.js).
+
+import { traduireRequete } from './translationClient.js';
 
 let devApiKey = null;
 try {
@@ -53,27 +59,34 @@ async function appelerApi(chemin, params) {
 }
 
 /**
- * Recherche de recettes par mots-clés + filtres régime/type de plat.
- * @param {{query:string, diet?:string, type?:string, number?:number}} params
+ * Recherche de recettes. `query` est saisie en français et traduite avant l'appel.
+ * @param {{query:string, diet?:string, type?:string, maxTemps?:number, number?:number}} params
+ * @returns {Promise<{resultats: object[], requeteTraduite: string}>}
  */
-export async function rechercherRecettes({ query, diet, type, number = 10 }) {
+export async function rechercherRecettes({ query, diet, type, maxTemps, number = 12 }) {
+  const { requete } = await traduireRequete(query || '');
+
   const data = await appelerApi('/recipes/complexSearch', {
-    query: query || '',
+    query: requete,
     ...(diet ? { diet } : {}),
     ...(type ? { type } : {}),
+    ...(maxTemps ? { maxReadyTime: String(maxTemps) } : {}),
     number: String(number),
     addRecipeNutrition: 'true',
+    addRecipeInformation: 'true',
     instructionsRequired: 'true',
     fillIngredients: 'true',
   });
-  return (data.results || []).map(mapperRecetteApiVersDomaine);
+
+  return {
+    resultats: (data.results || []).map(mapperRecetteApiVersDomaine),
+    requeteTraduite: requete,
+  };
 }
 
-/** Détail complet d'une recette (si besoin de re-fetch, ex. instructions manquantes). */
+/** Détail complet d'une recette (si la recherche n'a pas tout renvoyé). */
 export async function obtenirDetailRecette(idApi) {
-  const data = await appelerApi(`/recipes/${idApi}/information`, {
-    includeNutrition: 'true',
-  });
+  const data = await appelerApi(`/recipes/${idApi}/information`, { includeNutrition: 'true' });
   return mapperRecetteApiVersDomaine(data);
 }
 
@@ -112,30 +125,31 @@ function trouverNutriment(nutriments, nom) {
 /** Convertit une recette au format Spoonacular vers notre modèle Recipe. */
 function mapperRecetteApiVersDomaine(r) {
   const nutriments = r.nutrition?.nutrients || [];
-  const tags = [
-    ...(r.vegetarian ? ['vegetarien'] : []),
-    ...(r.dishTypes || []),
-  ];
+  const readyIn = r.readyInMinutes || 0;
+
   return {
     titre: r.title,
     source: 'api',
     url: r.sourceUrl || r.spoonacularSourceUrl || '',
-    tags,
-    tempsPrep: Math.round((r.preparationMinutes && r.preparationMinutes > 0
-      ? r.preparationMinutes
-      : (r.readyInMinutes || 0) / 2)),
-    tempsCuisson: Math.round((r.cookingMinutes && r.cookingMinutes > 0
-      ? r.cookingMinutes
-      : (r.readyInMinutes || 0) / 2)),
+    image: r.image || '',
+    tags: [...(r.dishTypes || []), ...(r.cuisines || [])],
+    regimes: {
+      vegetarien: Boolean(r.vegetarian),
+      vegan: Boolean(r.vegan),
+      sansGluten: Boolean(r.glutenFree),
+      sansLactose: Boolean(r.dairyFree),
+    },
+    tempsPrep: Math.round(r.preparationMinutes > 0 ? r.preparationMinutes : readyIn / 2),
+    tempsCuisson: Math.round(r.cookingMinutes > 0 ? r.cookingMinutes : readyIn / 2),
     portions: r.servings || 1,
     ingredients: (r.extendedIngredients || r.missedIngredients || r.usedIngredients || []).map((i) => ({
       nom: i.name || i.originalName || '',
-      quantite: i.amount || 0,
+      quantite: Math.round((i.amount || 0) * 10) / 10,
       unite: i.unit || '',
     })),
-    instructions: r.instructions || (r.analyzedInstructions?.[0]?.steps || [])
-      .map((s) => `${s.number}. ${s.step}`)
-      .join('\n'),
+    instructions:
+      r.instructions?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ||
+      (r.analyzedInstructions?.[0]?.steps || []).map((s) => `${s.number}. ${s.step}`).join('\n'),
     nutritionParPortion: {
       kcal: trouverNutriment(nutriments, 'Calories'),
       proteines: trouverNutriment(nutriments, 'Protein'),
@@ -146,6 +160,7 @@ function mapperRecetteApiVersDomaine(r) {
     effortScore: null,
     batchScore: null,
     favori: false,
+    langueOrigine: 'en',
     dateAjout: new Date().toISOString(),
     historiqueConsommation: [],
     _idApi: r.id,

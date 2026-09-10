@@ -5,12 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>NutriPlan</title>
   <meta name="description" content="Bibliothèque de recettes, qualification nutritionnelle et planning hebdomadaire personnel." />
-  <meta name="theme-color" content="#059669" />
+  <meta name="theme-color" content="#111111" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            rouge: '#D81E27',
+            noir: '#111111',
+            creme: '#F2EFE6',
+            jaune: '#F5B301',
+            bleu: '#1D4E89',
+            gris: '#8A8580',
+          },
+          fontFamily: {
+            titre: ['"Archivo Black"', 'system-ui', 'sans-serif'],
+            corps: ['Archivo', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            dur: '5px 5px 0 0 #111111',
+            'dur-sm': '3px 3px 0 0 #111111',
+            'dur-rouge': '5px 5px 0 0 #D81E27',
+          },
+        },
+      },
+    };
+  </script>
 
   <script type="importmap">
   {
@@ -27,11 +56,31 @@
 
   <style>
     html, body { height: 100%; overscroll-behavior-y: contain; }
-    body { -webkit-tap-highlight-color: transparent; }
+    body { -webkit-tap-highlight-color: transparent; font-family: Archivo, system-ui, sans-serif; }
     .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+    /* Entrée en mouvement : décalage vertical léger, jamais plus de 220ms. */
+    @keyframes monter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .anim-monter { animation: monter 220ms cubic-bezier(0.2, 0, 0.2, 1) both; }
+
+    /* Bande diagonale décorative — géométrie constructiviste, purement structurelle. */
+    .diagonale {
+      background-image: repeating-linear-gradient(
+        -45deg, #111111 0 8px, transparent 8px 16px
+      );
+    }
+
+    /* Les éléments interactifs s'enfoncent dans leur ombre dure au tap. */
+    .press { transition: transform 120ms ease, box-shadow 120ms ease; }
+    .press:active { transform: translate(3px, 3px); box-shadow: 0 0 0 0 #111111 !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .anim-monter { animation: none; }
+      .press { transition: none; }
+    }
   </style>
 </head>
-<body class="bg-slate-50">
+<body class="bg-creme font-corps text-noir">
   <div id="app"></div>
   <script type="module" src="/src/main.js"></script>
 </body>

@@ -5,25 +5,16 @@
 
 import { appliquerPreferenceGluten, calculerEffortScore, calculerBatchScore } from './scoring.js';
 import { pourcentageCouverture } from './nutrition.js';
+import { classifierRegime } from './classification.js';
+import { evaluerSaisonnalite } from './saisonnalite.js';
 
 export const POIDS_PAR_DEFAUT = {
-  completionNutrition: 0.35,
-  respectEnvies: 0.3,
-  effort: 0.2,
-  batch: 0.15,
+  completionNutrition: 0.3,
+  respectEnvies: 0.28,
+  effort: 0.18,
+  batch: 0.14,
+  saison: 0.1,
 };
-
-/**
- * Classe une recette par catégorie d'envie à partir de ses tags.
- * @param {import('../db/db.js').Recipe} recipe
- */
-function categorieEnvie(recipe) {
-  const tags = (recipe.tags || []).map((t) => t.toLowerCase());
-  if (tags.includes('vegetarien') || tags.includes('végétarien')) return 'vegetarien';
-  if (tags.includes('poisson')) return 'poisson';
-  if (tags.includes('viande')) return 'viande';
-  return 'autre';
-}
 
 /**
  * Score composite d'une recette candidate pour un créneau donné.
@@ -42,17 +33,21 @@ function scoreComposite(recipe, besoinsRestants, envieRestantes, preferences, po
   const ecartKcal = Math.abs(100 - couverture.kcal);
   const scoreNutrition = Math.max(0, 100 - ecartKcal);
 
-  const cat = categorieEnvie(recipe);
+  const cat = classifierRegime(recipe);
   const scoreEnvie = (envieRestantes[cat] || 0) > 0 ? 100 : 20;
 
   const effort = recipe.effortScore ?? calculerEffortScore(recipe);
   const batch = recipe.batchScore ?? calculerBatchScore(recipe);
 
+  const scoresSaison = { de_saison: 100, partiel: 60, inconnu: 50, hors_saison: 10 };
+  const scoreSaison = scoresSaison[evaluerSaisonnalite(recipe).statut];
+
   const composite =
     poids.completionNutrition * scoreNutrition +
     poids.respectEnvies * scoreEnvie +
     poids.effort * effort +
-    poids.batch * batch -
+    poids.batch * batch +
+    poids.saison * scoreSaison -
     malus * 100;
 
   return { composite, categorie: cat };

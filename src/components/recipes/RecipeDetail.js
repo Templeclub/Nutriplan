@@ -1,26 +1,34 @@
 import { html } from '../../htm-preact.js';
-import { Bouton, Badge, BarreProgression, Titre } from '../ui/ui.js';
+import { Bouton, Badge, Jauge, SousTitre, Alerte } from '../ui/ui.js';
 import { db } from '../../db/db.js';
 import { useLiveQuery } from '../../hooks/useLiveQuery.js';
 import { useActiveProfile } from '../../hooks/useActiveProfile.js';
 import { pourcentageCouverture } from '../../domain/nutrition.js';
+import { classifierRegime, LABELS_REGIME, COULEURS_REGIME } from '../../domain/classification.js';
+import { evaluerSaisonnalite } from '../../domain/saisonnalite.js';
 import { naviguerVers } from '../../router.js';
 
+// Ces tags sont déjà rendus par le badge de régime : les répéter n'apporte rien.
+const TAGS_DEJA_AFFICHES = new Set(['vegetarien', 'végétarien', 'vegan', 'poisson', 'viande']);
+
 const LIGNES_NUTRITION = [
-  ['kcal', 'Calories'],
-  ['proteines', 'Protéines'],
-  ['glucides', 'Glucides'],
-  ['lipides', 'Lipides'],
+  ['kcal', 'Calories', ''],
+  ['proteines', 'Protéines', 'g'],
+  ['glucides', 'Glucides', 'g'],
+  ['lipides', 'Lipides', 'g'],
 ];
 
 export const RecipeDetail = ({ id }) => {
   const recette = useLiveQuery(() => db.recipes.get(Number(id)), [id]);
   const profil = useActiveProfile();
 
-  if (recette === undefined) return html`<p class="text-slate-500">Chargement…</p>`;
-  if (recette === null) return html`<p class="text-slate-500">Recette introuvable.</p>`;
+  if (recette === undefined) return html`<p class="font-titre uppercase text-sm">Chargement…</p>`;
+  if (recette === null) return html`<p class="font-titre uppercase text-sm">Recette introuvable.</p>`;
 
   const couverture = profil ? pourcentageCouverture(recette.nutritionParPortion, profil.besoinsBase) : null;
+  const regime = classifierRegime(recette);
+  const saison = evaluerSaisonnalite(recette);
+  const etapes = (recette.instructions || '').split('\n').map((s) => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
 
   const toggleFavori = () => db.recipes.update(recette.id, { favori: !recette.favori });
   const marquerConsommee = () =>
@@ -33,58 +41,122 @@ export const RecipeDetail = ({ id }) => {
   };
 
   return html`
-    <div>
-      <button class="text-slate-500 text-sm mb-3" onClick=${() => naviguerVers('#/bibliotheque')}>← Retour</button>
+    <div class="pb-10 anim-monter">
+      <button class="font-titre text-xs uppercase tracking-widest mb-4 underline underline-offset-4" onClick=${() => naviguerVers('#/bibliotheque')}>
+        ← Bibliothèque
+      </button>
 
-      <div class="flex items-start justify-between gap-2 mb-2">
-        <${Titre}>${recette.titre}<//>
-        <button class="text-2xl leading-none" onClick=${toggleFavori}>${recette.favori ? '⭐' : '☆'}</button>
+      <!-- En-tête : titre plein cadre + bouton favori en aplat -->
+      <div class="flex border-[3px] border-noir shadow-dur bg-noir text-creme mb-4">
+        <h1 class="flex-1 font-titre text-2xl uppercase leading-none p-4">${recette.titre}</h1>
+        <button
+          class="w-14 shrink-0 border-l-[3px] border-creme text-2xl ${recette.favori ? 'bg-rouge' : 'bg-noir'}"
+          onClick=${toggleFavori}
+          aria-label="Favori"
+        >${recette.favori ? '★' : '☆'}</button>
       </div>
 
-      <div class="flex flex-wrap gap-1.5 mb-4">
-        <${Badge}>${recette.tempsPrep} min prépa<//>
-        <${Badge}>${recette.tempsCuisson} min cuisson<//>
-        <${Badge}>${recette.portions} portions<//>
-        ${recette.effortScore != null && html`<${Badge} couleur="emerald">Effort ${recette.effortScore}/100<//>`}
-        ${recette.batchScore != null && html`<${Badge} couleur="amber">Batch ${recette.batchScore}/100<//>`}
-        ${(recette.tags || []).map((t) => html`<${Badge} couleur="slate">${t}<//>`)}
+      <div class="flex flex-wrap gap-1 mb-4">
+        <${Badge} couleur=${COULEURS_REGIME[regime]}>${LABELS_REGIME[regime]}<//>
+        ${recette.regimes?.sansGluten && html`<${Badge} couleur="creme">Sans gluten<//>`}
+        ${recette.regimes?.vegan && html`<${Badge} couleur="jaune">Végan<//>`}
+        ${saison.statut === 'de_saison' && html`<${Badge} couleur="jaune">De saison<//>`}
+        ${saison.statut === 'partiel' && html`<${Badge} couleur="creme">Partiellement de saison<//>`}
+        ${saison.statut === 'hors_saison' && html`<${Badge} couleur="rouge">Hors saison<//>`}
+        ${(recette.tags || [])
+          .filter((t) => !TAGS_DEJA_AFFICHES.has(t.toLowerCase()))
+          .slice(0, 4)
+          .map((t) => html`<${Badge} couleur="creme">${t}<//>`)}
       </div>
 
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-4">
-        <p class="font-semibold mb-3">Nutrition par portion</p>
-        ${LIGNES_NUTRITION.map(([cle, label]) => {
-          const valeur = recette.nutritionParPortion?.[cle] || 0;
-          const pct = couverture?.[cle];
-          return html`
-            <div class="mb-2.5">
-              <div class="flex justify-between text-sm mb-1">
-                <span>${label}</span>
-                <span class="text-slate-500">${valeur}${cle === 'kcal' ? ' kcal' : ' g'} ${pct != null ? `· ${pct}%` : ''}</span>
-              </div>
-              ${pct != null && html`<${BarreProgression} pourcentage=${pct} couleur=${pct > 130 ? 'amber' : 'emerald'} />`}
+      <!-- Chiffres clés : grille franche, gros caractères, lisible de loin -->
+      <div class="grid grid-cols-4 border-[3px] border-noir bg-white shadow-dur mb-5">
+        ${[
+          [recette.tempsPrep, 'Prépa'],
+          [recette.tempsCuisson, 'Cuisson'],
+          [recette.portions, 'Portions'],
+          [recette.effortScore ?? '—', 'Effort'],
+        ].map(
+          ([valeur, label], i) => html`
+            <div class="${i < 3 ? 'border-r-[3px] border-noir' : ''} py-3 text-center">
+              <div class="font-titre text-2xl leading-none">${valeur}</div>
+              <div class="text-[9px] uppercase tracking-widest text-gris mt-1">${label}</div>
             </div>
-          `;
-        })}
-        ${!profil && html`<p class="text-xs text-slate-400 mt-2">Crée un profil pour voir le % de couverture de tes besoins.</p>`}
+          `
+        )}
       </div>
 
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-4">
-        <p class="font-semibold mb-2">Ingrédients (${recette.portions} portions)</p>
-        <ul class="list-disc list-inside text-sm text-slate-700 space-y-1">
-          ${(recette.ingredients || []).map((i) => html`<li>${i.quantite ? `${i.quantite} ${i.unite} ` : ''}${i.nom}</li>`)}
-        </ul>
+      ${saison.horsSaison.length > 0 &&
+      html`<${Alerte}>Hors saison en ce moment : ${saison.horsSaison.join(', ')}.<//>`}
+
+      <!-- Nutrition + couverture des besoins -->
+      <section class="mb-5">
+        <${SousTitre}>Nutrition par portion${profil ? ` · besoins de ${profil.nom}` : ''}<//>
+        <div class="bg-white border-[3px] border-noir shadow-dur p-3">
+          ${LIGNES_NUTRITION.map(([cle, label, unite]) => {
+            const valeur = recette.nutritionParPortion?.[cle] || 0;
+            const pct = couverture?.[cle];
+            return html`
+              <div class="mb-3 last:mb-0">
+                <div class="flex justify-between items-baseline mb-1">
+                  <span class="font-titre text-[11px] uppercase tracking-widest">${label}</span>
+                  <span class="font-titre text-sm">
+                    ${valeur}${unite}
+                    ${pct != null && html`<span class="text-rouge ml-2">${pct}%</span>`}
+                  </span>
+                </div>
+                ${pct != null && html`<${Jauge} pourcentage=${pct} couleur=${pct > 130 ? 'jaune' : 'rouge'} />`}
+              </div>
+            `;
+          })}
+          ${!profil && html`<p class="text-xs text-gris mt-2">Crée un profil pour voir la couverture de tes besoins.</p>`}
+        </div>
+      </section>
+
+      <section class="mb-5">
+        <${SousTitre}>Ingrédients · ${recette.portions} portions<//>
+        <div class="bg-white border-[3px] border-noir shadow-dur p-3">
+          <ul class="space-y-1.5">
+            ${(recette.ingredients || []).map(
+              (i) => html`<li class="flex gap-2.5 text-sm">
+                <span class="w-2 h-2 bg-rouge mt-1.5 shrink-0"></span>
+                <span><strong class="font-titre text-xs">${i.quantite ? `${i.quantite} ${i.unite}` : ''}</strong> ${i.nom}</span>
+              </li>`
+            )}
+          </ul>
+        </div>
+      </section>
+
+      <section class="mb-5">
+        <${SousTitre}>Préparation<//>
+        ${etapes.length === 0
+          ? html`<p class="text-sm text-gris">Aucune instruction enregistrée.</p>`
+          : html`<ol class="space-y-2">
+              ${etapes.map(
+                (etape, i) => html`
+                  <li class="flex gap-3 bg-white border-[3px] border-noir p-3">
+                    <span class="font-titre text-xl text-rouge leading-none shrink-0">${String(i + 1).padStart(2, '0')}</span>
+                    <span class="text-sm leading-snug">${etape}</span>
+                  </li>
+                `
+              )}
+            </ol>`}
+        ${recette.url &&
+        html`<a href=${recette.url} target="_blank" rel="noreferrer" class="inline-block mt-3 font-titre text-[11px] uppercase tracking-widest underline underline-offset-4">
+          Voir la source ↗
+        </a>`}
+      </section>
+
+      <div class="flex gap-2">
+        <${Bouton} class="flex-1" onClick=${marquerConsommee}>Cuisinée aujourd'hui<//>
+        <${Bouton} variante="danger" onClick=${supprimer}>Suppr.<//>
       </div>
 
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-4">
-        <p class="font-semibold mb-2">Instructions</p>
-        <p class="text-sm text-slate-700 whitespace-pre-line">${recette.instructions || '—'}</p>
-        ${recette.url && html`<a href=${recette.url} target="_blank" rel="noreferrer" class="text-sm text-emerald-700 underline mt-2 inline-block">Source originale</a>`}
-      </div>
-
-      <div class="flex gap-2 mb-8">
-        <${Bouton} onClick=${marquerConsommee}>Marquer comme consommée<//>
-        <${Bouton} variante="danger" onClick=${supprimer}>Supprimer<//>
-      </div>
+      ${recette.historiqueConsommation?.length > 0 &&
+      html`<p class="text-xs text-gris mt-3">
+        Cuisinée ${recette.historiqueConsommation.length} fois · dernière le
+        ${new Date(recette.historiqueConsommation.at(-1)).toLocaleDateString('fr-FR')}
+      </p>`}
     </div>
   `;
 };

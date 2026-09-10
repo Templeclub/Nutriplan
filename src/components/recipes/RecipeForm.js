@@ -1,12 +1,12 @@
 import { useState } from 'preact/hooks';
 import { html } from '../../htm-preact.js';
-import { Bouton, Champ, inputClass, Titre } from '../ui/ui.js';
+import { Bouton, Champ, Chip, Titre, Alerte, SousTitre, inputClass } from '../ui/ui.js';
 import { db } from '../../db/db.js';
 import { estimerNutritionIngredients } from '../../api/spoonacularClient.js';
 import { calculerEffortScore, calculerBatchScore } from '../../domain/scoring.js';
 import { naviguerVers } from '../../router.js';
 
-const TAGS_DISPONIBLES = ['vegetarien', 'poisson', 'viande', 'plat-principal', 'entree', 'dessert'];
+const TAGS_DISPONIBLES = ['vegetarien', 'poisson', 'viande', 'plat-principal', 'entree', 'dessert', 'soupe', 'salade'];
 
 export const RecipeForm = ({ onFermer }) => {
   const [titre, setTitre] = useState('');
@@ -17,21 +17,18 @@ export const RecipeForm = ({ onFermer }) => {
   const [tags, setTags] = useState([]);
   const [ingredients, setIngredients] = useState([{ nom: '', quantite: '', unite: '' }]);
   const [enregistrement, setEnregistrement] = useState(false);
-  const [erreur, setErreur] = useState('');
+  const [avertissement, setAvertissement] = useState('');
 
   const majIngredient = (i, champ, valeur) =>
     setIngredients((liste) => liste.map((ing, idx) => (idx === i ? { ...ing, [champ]: valeur } : ing)));
 
-  const ajouterLigneIngredient = () => setIngredients((l) => [...l, { nom: '', quantite: '', unite: '' }]);
-  const retirerLigneIngredient = (i) => setIngredients((l) => l.filter((_, idx) => idx !== i));
-
-  const toggleTag = (tag) =>
-    setTags((t) => (t.includes(tag) ? t.filter((x) => x !== tag) : [...t, tag]));
+  const toggleTag = (tag) => setTags((t) => (t.includes(tag) ? t.filter((x) => x !== tag) : [...t, tag]));
 
   const enregistrer = async (e) => {
     e.preventDefault();
     setEnregistrement(true);
-    setErreur('');
+    setAvertissement('');
+
     const ingredientsValides = ingredients
       .filter((i) => i.nom.trim())
       .map((i) => ({ ...i, quantite: Number(i.quantite) || 0 }));
@@ -42,16 +39,22 @@ export const RecipeForm = ({ onFermer }) => {
         nutritionParPortion = await estimerNutritionIngredients(ingredientsValides, Number(portions));
       }
     } catch (err) {
-      setErreur(
-        `Recette enregistrée sans estimation nutritionnelle automatique (${err.message}). Tu pourras la corriger plus tard.`
-      );
+      setAvertissement(`Enregistrée sans estimation nutritionnelle (${err.message})`);
     }
 
     const donnees = {
       titre,
       source: 'manuel',
       url: '',
+      image: '',
       tags,
+      regimes: {
+        vegetarien: tags.includes('vegetarien'),
+        vegan: false,
+        sansGluten: false,
+        sansLactose: false,
+      },
+      langueOrigine: 'fr',
       tempsPrep: Number(tempsPrep),
       tempsCuisson: Number(tempsCuisson),
       portions: Number(portions),
@@ -71,62 +74,63 @@ export const RecipeForm = ({ onFermer }) => {
   };
 
   return html`
-    <form onSubmit=${enregistrer}>
-      <div class="flex items-center justify-between mb-4">
-        <${Titre}>Ajouter une recette<//>
-        <button type="button" class="text-slate-500 text-sm" onClick=${onFermer}>Fermer</button>
+    <form onSubmit=${enregistrer} class="pb-10">
+      <div class="flex items-start justify-between gap-3">
+        <${Titre}>Nouvelle recette<//>
+        <button type="button" class="font-titre text-xs uppercase underline underline-offset-4 mt-1.5" onClick=${onFermer}>Fermer</button>
       </div>
 
       <${Champ} label="Titre">
-        <input class=${inputClass} required value=${titre} onInput=${(e) => setTitre(e.target.value)} />
+        <input class=${inputClass} required value=${titre} onInput=${(e) => setTitre(e.target.value)} placeholder="Curry de lentilles" />
       <//>
 
-      <div class="grid grid-cols-3 gap-3">
-        <${Champ} label="Prépa (min)">
-          <input class=${inputClass} type="number" value=${tempsPrep} onInput=${(e) => setTempsPrep(e.target.value)} />
+      <div class="grid grid-cols-3 gap-2">
+        <${Champ} label="Prépa">
+          <input class=${inputClass} type="number" min="0" value=${tempsPrep} onInput=${(e) => setTempsPrep(e.target.value)} />
         <//>
-        <${Champ} label="Cuisson (min)">
-          <input class=${inputClass} type="number" value=${tempsCuisson} onInput=${(e) => setTempsCuisson(e.target.value)} />
+        <${Champ} label="Cuisson">
+          <input class=${inputClass} type="number" min="0" value=${tempsCuisson} onInput=${(e) => setTempsCuisson(e.target.value)} />
         <//>
         <${Champ} label="Portions">
-          <input class=${inputClass} type="number" value=${portions} onInput=${(e) => setPortions(e.target.value)} />
+          <input class=${inputClass} type="number" min="1" value=${portions} onInput=${(e) => setPortions(e.target.value)} />
         <//>
       </div>
 
-      <p class="text-sm font-medium text-slate-600 mb-2">Tags</p>
-      <div class="flex flex-wrap gap-2 mb-4">
-        ${TAGS_DISPONIBLES.map(
-          (tag) => html`<button type="button"
-            class="text-sm px-3 py-1.5 rounded-full min-h-[36px] ${tags.includes(tag) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}"
-            onClick=${() => toggleTag(tag)}
-          >${tag}</button>`
-        )}
+      <${SousTitre}>Tags<//>
+      <div class="flex flex-wrap gap-1.5 mb-5">
+        ${TAGS_DISPONIBLES.map((tag) => html`<${Chip} actif=${tags.includes(tag)} onClick=${() => toggleTag(tag)}>${tag}<//>`)}
       </div>
 
-      <p class="text-sm font-medium text-slate-600 mb-2">Ingrédients</p>
-      ${ingredients.map(
-        (ing, i) => html`
-          <div class="flex gap-2 mb-2">
-            <input class="${inputClass} flex-1" placeholder="nom" value=${ing.nom}
-              onInput=${(e) => majIngredient(i, 'nom', e.target.value)} />
-            <input class="${inputClass} w-20" placeholder="qté" value=${ing.quantite}
-              onInput=${(e) => majIngredient(i, 'quantite', e.target.value)} />
-            <input class="${inputClass} w-24" placeholder="unité" value=${ing.unite}
-              onInput=${(e) => majIngredient(i, 'unite', e.target.value)} />
-            <button type="button" class="text-red-500 px-2" onClick=${() => retirerLigneIngredient(i)}>✕</button>
-          </div>
-        `
-      )}
-      <button type="button" class="text-emerald-700 text-sm mb-4" onClick=${ajouterLigneIngredient}>+ Ajouter un ingrédient</button>
+      <${SousTitre}>Ingrédients<//>
+      <div class="space-y-2 mb-3">
+        ${ingredients.map(
+          (ing, i) => html`
+            <div class="flex gap-1.5">
+              <input class="${inputClass} flex-1" placeholder="nom" value=${ing.nom}
+                onInput=${(e) => majIngredient(i, 'nom', e.target.value)} />
+              <input class="${inputClass} w-16" placeholder="qté" inputmode="decimal" value=${ing.quantite}
+                onInput=${(e) => majIngredient(i, 'quantite', e.target.value)} />
+              <input class="${inputClass} w-16" placeholder="unité" value=${ing.unite}
+                onInput=${(e) => majIngredient(i, 'unite', e.target.value)} />
+              <button type="button" class="w-11 shrink-0 border-[3px] border-noir bg-white text-rouge font-titre"
+                onClick=${() => setIngredients((l) => l.filter((_, idx) => idx !== i))}>✕</button>
+            </div>
+          `
+        )}
+      </div>
+      <${Bouton} variante="secondaire" class="mb-5"
+        onClick=${() => setIngredients((l) => [...l, { nom: '', quantite: '', unite: '' }])}>+ Ingrédient<//>
 
-      <${Champ} label="Instructions (une étape par ligne)">
-        <textarea class="${inputClass} min-h-[120px]" value=${instructions}
+      <${Champ} label="Préparation" indice="Une étape par ligne">
+        <textarea class="${inputClass} min-h-[140px]" value=${instructions}
           onInput=${(e) => setInstructions(e.target.value)}></textarea>
       <//>
 
-      ${erreur && html`<p class="text-amber-700 text-sm mb-3">${erreur}</p>`}
+      ${avertissement && html`<${Alerte}>${avertissement}<//>`}
 
-      <${Bouton} type="submit" disabled=${enregistrement}>${enregistrement ? 'Enregistrement…' : 'Enregistrer la recette'}<//>
+      <${Bouton} type="submit" class="w-full" disabled=${enregistrement}>
+        ${enregistrement ? 'Enregistrement…' : 'Enregistrer'}
+      <//>
     </form>
   `;
 };

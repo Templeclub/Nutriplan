@@ -7,16 +7,13 @@ import { RecipeDetail } from './components/recipes/RecipeDetail.js';
 import { WeeklyPlanner } from './components/planning/WeeklyPlanner.js';
 
 const ONGLETS = [
-  { route: '/bibliotheque', label: 'Bibliothèque', icone: '📖' },
-  { route: '/planning', label: 'Planning', icone: '🗓️' },
-  { route: '/profils', label: 'Profils', icone: '👤' },
+  { route: '/bibliotheque', label: 'Recettes' },
+  { route: '/planning', label: 'Semaine' },
+  { route: '/profils', label: 'Profils' },
 ];
 
 function ecranPourRoute(route) {
-  if (route.startsWith('/recette/')) {
-    const id = route.split('/')[2];
-    return html`<${RecipeDetail} id=${id} />`;
-  }
+  if (route.startsWith('/recette/')) return html`<${RecipeDetail} id=${route.split('/')[2]} />`;
   if (route === '/planning') return html`<${WeeklyPlanner} />`;
   if (route === '/profils') return html`<${ProfileList} />`;
   return html`<${RecipeLibrary} />`;
@@ -27,28 +24,34 @@ export const App = () => {
   const ongletActif = route.startsWith('/recette/') ? '/bibliotheque' : route;
 
   return html`
-    <div class="min-h-screen bg-slate-50 flex flex-col">
-      <header class="bg-white border-b border-slate-100 px-4 py-3">
-        <h1 class="text-lg font-bold text-emerald-700">🥗 NutriPlan</h1>
+    <div class="min-h-screen flex flex-col">
+      <!-- Bandeau titre : bloc noir plein, logotype géométrique -->
+      <header class="bg-creme border-b-[3px] border-noir">
+        <div class="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+          <div class="w-7 h-7 bg-rouge shrink-0" style="clip-path: polygon(0 0, 100% 0, 100% 100%)"></div>
+          <h1 class="font-titre text-xl uppercase tracking-tight leading-none">Nutri<span class="text-rouge">plan</span></h1>
+        </div>
       </header>
+
       <${ProfileSwitcher} />
 
-      <main class="flex-1 px-4 py-4 max-w-lg mx-auto w-full">
+      <main class="flex-1 px-4 py-5 max-w-lg mx-auto w-full">
         ${ecranPourRoute(route)}
       </main>
 
-      <nav class="sticky bottom-0 bg-white border-t border-slate-200 flex safe-bottom">
-        ${ONGLETS.map(
-          (o) => html`
-            <button
-              class="flex-1 min-h-[56px] flex flex-col items-center justify-center gap-0.5 text-xs ${ongletActif === o.route ? 'text-emerald-700 font-semibold' : 'text-slate-500'}"
-              onClick=${() => naviguerVers(`#${o.route}`)}
-            >
-              <span class="text-lg">${o.icone}</span>
-              ${o.label}
-            </button>
-          `
-        )}
+      <nav class="sticky bottom-0 bg-creme border-t-[3px] border-noir safe-bottom">
+        <div class="max-w-lg mx-auto flex">
+          ${ONGLETS.map(
+            (o) => html`
+              <button
+                class="flex-1 min-h-[56px] font-titre text-xs uppercase tracking-widest border-r-[3px] border-noir last:border-r-0 transition-colors ${ongletActif === o.route
+                  ? 'bg-noir text-creme'
+                  : 'bg-creme text-noir'}"
+                onClick=${() => naviguerVers(`#${o.route}`)}
+              >${o.label}</button>
+            `
+          )}
+        </div>
       </nav>
     </div>
   `;

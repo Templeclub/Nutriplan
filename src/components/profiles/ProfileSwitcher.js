@@ -4,15 +4,14 @@ import { useLiveQuery } from '../../hooks/useLiveQuery.js';
 import { useActiveProfile, definirProfilActif } from '../../hooks/useActiveProfile.js';
 import { calculerBesoins, NIVEAUX_ACTIVITE, LABELS_ACTIVITE } from '../../domain/nutrition.js';
 
-/** Bandeau compact : profil actif + sélecteur d'activité du jour (recalcule direct). */
+/** Bandeau permanent : profil actif + activité du jour, recalcul immédiat des besoins. */
 export const ProfileSwitcher = () => {
   const profils = useLiveQuery(() => db.profiles.toArray(), [], []);
   const actif = useActiveProfile();
 
-  if (!profils || profils.length === 0) return null;
+  if (!profils || profils.length === 0 || !actif) return null;
 
   const changerActivite = async (niveau) => {
-    if (!actif) return;
     const besoinsBase = calculerBesoins(
       { poidsKg: actif.poidsKg, tailleCm: actif.tailleCm, age: actif.age, sexe: actif.sexe },
       niveau
@@ -21,27 +20,32 @@ export const ProfileSwitcher = () => {
   };
 
   return html`
-    <div class="bg-emerald-50 border-b border-emerald-100 px-4 py-2 flex items-center gap-2 overflow-x-auto">
-      ${profils.length > 1 &&
-      html`<select
-        class="text-sm font-medium bg-transparent border-none focus:outline-none"
-        value=${actif?.id}
-        onChange=${(e) => definirProfilActif(Number(e.target.value))}
-      >
-        ${profils.map((p) => html`<option value=${p.id}>${p.nom}</option>`)}
-      </select>`}
-      <span class="text-slate-300">|</span>
-      <div class="flex gap-1">
-        ${NIVEAUX_ACTIVITE.map(
-          (n) => html`<button
-            class="text-xs px-2.5 py-1 rounded-full min-h-[32px] ${actif?.niveauActiviteDuJour === n
-              ? 'bg-emerald-600 text-white'
-              : 'bg-white text-slate-600 border border-slate-200'}"
-            onClick=${() => changerActivite(n)}
-          >${LABELS_ACTIVITE[n]}</button>`
-        )}
+    <div class="bg-noir text-creme border-b-[3px] border-noir">
+      <div class="max-w-lg mx-auto px-3 py-2 flex items-center gap-2">
+        ${profils.length > 1
+          ? html`<select
+              class="bg-noir text-creme font-titre text-[10px] uppercase tracking-wider border-none focus:outline-none max-w-[68px] truncate"
+              value=${actif.id}
+              onChange=${(e) => definirProfilActif(Number(e.target.value))}
+            >
+              ${profils.map((p) => html`<option value=${p.id}>${p.nom}</option>`)}
+            </select>`
+          : html`<span class="font-titre text-[10px] uppercase tracking-wider max-w-[68px] truncate">${actif.nom}</span>`}
+
+        <div class="flex gap-0.5 flex-1 justify-center">
+          ${NIVEAUX_ACTIVITE.map(
+            (n) => html`<button
+              class="min-h-[34px] px-1.5 font-titre text-[9px] uppercase border-2 ${actif.niveauActiviteDuJour === n
+                ? 'bg-rouge border-rouge text-creme'
+                : 'bg-noir border-creme/30 text-creme/70'}"
+              onClick=${() => changerActivite(n)}
+              title=${LABELS_ACTIVITE[n]}
+            >${LABELS_ACTIVITE[n].slice(0, 3)}</button>`
+          )}
+        </div>
+
+        <span class="font-titre text-xs whitespace-nowrap shrink-0">${actif.besoinsBase?.kcal || 0}<span class="text-[9px] text-creme/60 ml-0.5">kcal</span></span>
       </div>
-      ${actif && html`<span class="ml-auto text-xs text-slate-500 whitespace-nowrap">${actif.besoinsBase?.kcal || 0} kcal/j</span>`}
     </div>
   `;
 };

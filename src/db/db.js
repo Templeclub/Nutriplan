@@ -26,11 +26,20 @@ db.version(1).stores({
  * @property {number} lipides
  * @property {number} fibres
  *
+ * @typedef {Object} Regimes
+ * @property {boolean} vegetarien
+ * @property {boolean} vegan
+ * @property {boolean} sansGluten
+ * @property {boolean} sansLactose
+ *
  * @typedef {Object} Recipe
  * @property {number} [id]
  * @property {string} titre
- * @property {'manuel'|'api'} source
+ * @property {'manuel'|'api'|'url'} source
  * @property {string} [url]
+ * @property {string} [image]
+ * @property {Regimes} [regimes]
+ * @property {'fr'|'en'} [langueOrigine]
  * @property {string[]} tags  // ex: ['vegetarien', 'plat-principal', 'poulet']
  * @property {number} tempsPrep  // minutes
  * @property {number} tempsCuisson  // minutes

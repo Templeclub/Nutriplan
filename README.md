@@ -14,10 +14,36 @@ ES), sans bundler :
 - **Dexie.js** (IndexedDB) pour le stockage local, chargé via CDN.
 - **Spoonacular API**, appelée en production via une fonction serverless Vercel
   (`api/spoonacular.js`) qui cache la clé API.
+- **DeepL** (`api/translate.js`) pour la traduction FR↔EN, et **import par URL**
+  (`api/recipe-import.js`) depuis les sites de recettes francophones.
 - **PWA** : `manifest.webmanifest` + `sw.js` écrits à la main (précache l'app shell,
   y compris les libs CDN, pour la consultation hors-ligne).
 
 Aucune étape `npm install` / `npm run build` n'est nécessaire : les fichiers sont servis tels quels.
+
+## Français : trois mécanismes complémentaires
+
+L'API de recettes est anglophone, il n'existe pas d'équivalent francophone public fiable.
+La francisation repose donc sur :
+
+1. **Lexique culinaire embarqué** (`src/domain/lexique-culinaire.js`, ~250 termes) : traduit
+   la requête de recherche FR→EN **sans aucun appel réseau**. « poulet curry » → « chicken curry ».
+2. **DeepL** en secours quand la requête sort du lexique, et pour traduire le contenu d'une
+   recette EN→FR **une seule fois, au moment de l'ajout** — la recette est ensuite stockée en
+   français, donc jamais retraduite. Le quota gratuit (500k car./mois) est très largement suffisant.
+3. **Import par URL** depuis Marmiton, 750g, CuisineAZ… : la fonction serverless lit le
+   JSON-LD `schema.org/Recipe` de la page. Contenu **nativement en français, sans quota**.
+
+Les heuristiques (régime, gluten, batch-cooking) sont **bilingues** : les résultats de
+recherche sont classés avant d'être traduits. Elles comparent des **mots entiers** — en
+sous-chaîne, « vegetable » contient « ble » et « Malabar » contient « bar ».
+
+## Qualification supplémentaire : saisonnalité
+
+`src/domain/saisonnalite.js` embarque un calendrier France métropolitaine (fruits/légumes par
+mois) croisé avec les ingrédients : badge « de saison » / « hors saison », filtre dédié dans la
+bibliothèque, et pondération dans l'algorithme de planning. Un ingrédient n'est rattaché qu'au
+produit le plus spécifique qu'il désigne (« pomme de terre » n'est jamais une « pomme »).
 
 ## Lancer en local
 
@@ -41,11 +67,19 @@ Sans cette clé, la recherche et l'estimation nutritionnelle des recettes manuel
 fonctionnent pas en local — mais tout le reste de l'app (profils, bibliothèque, planning
 sur des recettes déjà ajoutées) fonctionne normalement.
 
+**Deux fonctionnalités ne marchent qu'une fois déployées**, car elles exigent le serveur :
+- la **traduction DeepL** (l'API DeepL refuse les appels navigateur) → en local, les recettes
+  importées restent en anglais ; le lexique traduit quand même la requête de recherche ;
+- l'**import par URL** (lire une page d'un autre domaine est bloqué par le navigateur).
+
 ## Déploiement (Vercel)
 
 1. Pousse le projet sur un repo GitHub.
 2. Importe-le sur [vercel.com](https://vercel.com) (Framework preset : *Other*, pas de build command).
-3. Dans les *Environment Variables* du projet Vercel, ajoute `SPOONACULAR_API_KEY` avec ta clé.
+3. Dans les *Environment Variables* du projet Vercel, ajoute :
+   - `SPOONACULAR_API_KEY` — https://spoonacular.com/food-api
+   - `DEEPL_API_KEY` — https://www.deepl.com/pro-api (offre gratuite : 500k car./mois).
+     Les clés gratuites finissent par `:fx`, le code bascule automatiquement sur `api-free.deepl.com`.
 4. Déploie. Le site est statique + une fonction serverless (`/api/spoonacular`) — le
    build Vercel s'exécute dans le cloud, tu n'as pas besoin de Node en local pour ça.
 5. Sur ton téléphone Android, ouvre l'URL Vercel dans Chrome → menu → **"Installer l'application"**.

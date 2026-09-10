@@ -2,7 +2,7 @@
 // (import map), pour permettre la consultation hors-ligne des recettes déjà
 // synchronisées dans IndexedDB (qui, elle, fonctionne nativement hors-ligne).
 // Incrémenter CACHE_VERSION à chaque déploiement pour forcer le renouvellement du cache.
-const CACHE_VERSION = 'nutriplan-v1';
+const CACHE_VERSION = 'nutriplan-v2';
 
 const RESSOURCES_LOCALES = [
   '/',
@@ -16,7 +16,13 @@ const RESSOURCES_LOCALES = [
   '/src/domain/nutrition.js',
   '/src/domain/scoring.js',
   '/src/domain/planning.js',
+  '/src/domain/texte.js',
+  '/src/domain/saisonnalite.js',
+  '/src/domain/classification.js',
+  '/src/domain/lexique-culinaire.js',
   '/src/api/spoonacularClient.js',
+  '/src/api/translationClient.js',
+  '/src/api/recipeUrlClient.js',
   '/src/hooks/useLiveQuery.js',
   '/src/hooks/useActiveProfile.js',
   '/src/components/ui/ui.js',
@@ -29,6 +35,7 @@ const RESSOURCES_LOCALES = [
   '/src/components/recipes/RecipeForm.js',
   '/src/components/recipes/RecipeDetail.js',
   '/src/components/recipes/RecipeLibrary.js',
+  '/src/components/recipes/RecipeUrlImport.js',
   '/src/components/planning/WeeklyPlanner.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -42,6 +49,7 @@ const RESSOURCES_CDN = [
   'https://esm.sh/htm@3.1.1',
   'https://esm.sh/htm@3.1.1/preact?external=preact',
   'https://esm.sh/dexie@4.0.11',
+  'https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700&display=swap',
 ];
 
 self.addEventListener('install', (event) => {

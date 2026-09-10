@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import { html } from '../../htm-preact.js';
-import { Bouton, Carte } from '../ui/ui.js';
+import { Bouton } from '../ui/ui.js';
 import { db } from '../../db/db.js';
 
 /** Export/import JSON de toute la base locale — sauvegarde et portabilité des données. */
@@ -31,8 +31,7 @@ export const DataBackup = () => {
     if (!fichier) return;
     setMessage('');
     try {
-      const texte = await fichier.text();
-      const donnees = JSON.parse(texte);
+      const donnees = JSON.parse(await fichier.text());
       if (!donnees || typeof donnees !== 'object') throw new Error('Fichier invalide');
 
       const confirmation = confirm(
@@ -48,22 +47,23 @@ export const DataBackup = () => {
       });
       setMessage('Import réussi.');
     } catch (err) {
-      setMessage(`Échec de l'import : ${err.message}`);
+      setMessage(`Échec : ${err.message}`);
     } finally {
       if (inputRef.current) inputRef.current.value = '';
     }
   };
 
   return html`
-    <${Carte} class="mt-2">
-      <p class="font-semibold mb-1">Sauvegarde des données</p>
-      <p class="text-xs text-slate-500 mb-3">Tes données restent locales à cet appareil. Exporte régulièrement une sauvegarde JSON.</p>
+    <div class="bg-white border-[3px] border-noir shadow-dur p-3">
+      <p class="text-xs text-gris mb-3">
+        Tes données ne quittent pas cet appareil. Exporte régulièrement une sauvegarde.
+      </p>
       <div class="flex gap-2">
-        <${Bouton} variante="secondaire" onClick=${exporter}>Exporter (JSON)<//>
-        <${Bouton} variante="secondaire" onClick=${() => inputRef.current?.click()}>Importer<//>
+        <${Bouton} variante="secondaire" class="flex-1" onClick=${exporter}>Exporter<//>
+        <${Bouton} variante="secondaire" class="flex-1" onClick=${() => inputRef.current?.click()}>Importer<//>
       </div>
       <input ref=${inputRef} type="file" accept="application/json" class="hidden" onChange=${importer} />
-      ${message && html`<p class="text-xs mt-2 text-slate-600">${message}</p>`}
-    <//>
+      ${message && html`<p class="font-titre text-[11px] uppercase tracking-wider mt-3">${message}</p>`}
+    </div>
   `;
 };

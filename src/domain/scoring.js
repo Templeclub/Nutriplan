@@ -1,28 +1,34 @@
 // Scores de recette : préférences alimentaires (ex. gluten), effort, batch-cooking.
 
-// Mots-clés heuristiques pour détecter la présence de gluten dans une recette
-// (utilisé faute de donnée structurée fiable venant de l'API ou de la saisie manuelle).
+import { normaliser, contientExpression } from './texte.js';
+
+// Termes signalant du gluten, en français et en anglais : une recette issue de
+// la recherche est évaluée avant d'être traduite. La comparaison porte sur des
+// mots entiers — en sous-chaîne, "vegetable" contiendrait "ble".
 const MOTS_CLES_GLUTEN = [
-  'blé', 'ble', 'farine', 'pâte', 'pate', 'pâtes', 'pates', 'pain', 'baguette',
-  'couscous', 'semoule', 'orge', 'seigle', 'pizza', 'burger', 'chapelure',
-  'biscuit', 'gâteau', 'gateau', 'sauce soja', 'nouilles', 'boulgour',
+  'ble', 'wheat', 'farine', 'flour', 'pate', 'pates', 'pasta', 'spaghetti',
+  'tagliatelle', 'macaroni', 'penne', 'lasagne', 'lasagna', 'ravioli', 'gnocchi',
+  'orzo', 'pain', 'bread', 'baguette', 'brioche', 'couscous', 'semoule',
+  'semolina', 'orge', 'barley', 'seigle', 'rye', 'epeautre', 'spelt', 'pizza',
+  'burger', 'bun', 'buns', 'chapelure', 'breadcrumbs', 'croutons', 'biscuit',
+  'cookie', 'cookies', 'cracker', 'crackers', 'gateau', 'cake', 'nouilles',
+  'noodles', 'boulgour', 'bulgur', 'tortilla', 'wrap', 'sauce soja', 'soy sauce',
+  'pastry', 'puff pastry', 'phyllo', 'pie crust',
 ];
 
 /**
- * Estime une teneur "gluten probable" 0 (aucun signal) à 1 (fort signal) à partir
- * des ingrédients/titre/tags. Heuristique volontairement simple pour le MVP.
+ * Estime une teneur "gluten probable" de 0 (aucun signal) à 1 (fort signal).
  * @param {import('../db/db.js').Recipe} recipe
  */
 export function estimerScoreGluten(recipe) {
-  const texte = [
-    recipe.titre,
-    ...(recipe.tags || []),
-    ...(recipe.ingredients || []).map((i) => i.nom),
-  ]
-    .join(' ')
-    .toLowerCase();
+  // Le flag de l'API est fiable et prime sur l'heuristique.
+  if (recipe.regimes?.sansGluten) return 0;
 
-  const occurrences = MOTS_CLES_GLUTEN.filter((mot) => texte.includes(mot)).length;
+  const texte = normaliser(
+    [recipe.titre, ...(recipe.tags || []), ...(recipe.ingredients || []).map((i) => i.nom)].join(' ')
+  );
+
+  const occurrences = MOTS_CLES_GLUTEN.filter((mot) => contientExpression(texte, mot)).length;
   return Math.min(1, occurrences / 3);
 }
 
@@ -72,13 +78,14 @@ export function calculerEffortScore(recipe) {
 
 // Ingrédients dont la présence suggère une bonne tenue à la congélation.
 const MOTS_CLES_CONGELABLE = [
-  'soupe', 'velouté', 'veloute', 'curry', 'chili', 'ragoût', 'ragout', 'bolognaise',
-  'sauce tomate', 'dahl', 'dal', 'lentilles', 'haricots', 'riz', 'gratin', 'tajine',
-  'pot-au-feu', 'bouillon', 'compote',
+  'soupe', 'soup', 'veloute', 'curry', 'chili', 'ragout', 'stew', 'bolognaise',
+  'bolognese', 'sauce tomate', 'tomato sauce', 'dahl', 'dal', 'lentilles',
+  'lentils', 'haricots', 'beans', 'riz', 'rice', 'gratin', 'tajine', 'tagine',
+  'pot au feu', 'bouillon', 'broth', 'compote', 'casserole', 'lasagne', 'lasagna',
 ];
 const MOTS_CLES_NON_CONGELABLE = [
-  'salade', 'crudité', 'crudite', 'avocat', 'mayonnaise', 'oeuf dur', 'œuf dur',
-  'concombre', 'tartare', 'ceviche', 'carpaccio',
+  'salade', 'salad', 'crudite', 'crudites', 'avocat', 'avocado', 'mayonnaise',
+  'oeuf dur', 'concombre', 'cucumber', 'tartare', 'ceviche', 'carpaccio', 'sushi',
 ];
 
 /**
@@ -89,14 +96,14 @@ const MOTS_CLES_NON_CONGELABLE = [
  * @param {boolean|null} [tagBatchManuel]
  */
 export function calculerBatchScore(recipe, tagBatchManuel = null) {
-  const texte = [recipe.titre, ...(recipe.tags || [])].join(' ').toLowerCase();
+  const texte = normaliser([recipe.titre, ...(recipe.tags || [])].join(' '));
 
   let compatCongelation;
   if (tagBatchManuel !== null && tagBatchManuel !== undefined) {
     compatCongelation = tagBatchManuel ? 1 : 0;
   } else {
-    const bon = MOTS_CLES_CONGELABLE.some((m) => texte.includes(m));
-    const mauvais = MOTS_CLES_NON_CONGELABLE.some((m) => texte.includes(m));
+    const bon = MOTS_CLES_CONGELABLE.some((m) => contientExpression(texte, m));
+    const mauvais = MOTS_CLES_NON_CONGELABLE.some((m) => contientExpression(texte, m));
     compatCongelation = mauvais ? 0.1 : bon ? 1 : 0.5;
   }
 
